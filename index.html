@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BodyLabCyber - E-commerce Lab para Pentest</title>
+    
+    <!-- Carrega Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* Cores inspiradas em nutrição esportiva: Verde Lima (Vibrante) e Azul Marinho (Força) */
+        :root {
+            --color-primary: #34d399; /* Emerald 400 - Verde/Saúde */
+            --color-secondary: #1e3a8a; /* Blue 900 - Azul Marinho/Força */
+            --color-accent: #f97316; /* Orange 600 - Energia/Pré-treino */
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f7f7;
+            color: #1f2937;
+        }
+        .text-primary { color: var(--color-primary); }
+        .bg-primary { background-color: var(--color-primary); }
+        .text-secondary { color: var(--color-secondary); }
+        .bg-secondary { background-color: var(--color-secondary); }
+        .btn-primary {
+            background-color: var(--color-primary);
+            color: white;
+            transition: all 0.2s;
+        }
+        .btn-primary:hover {
+            background-color: #10b981; /* Emerald 500 */
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        }
+        .input-vulnerable:focus {
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.5);
+        }
+        /* Estilo para simular um modal de alerta customizado */
+        #custom-alert {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+        }
+
+        /* Estilos específicos para o banner */
+        .main-banner {
+            background-color: var(--color-secondary); /* Cor de fundo para o banner */
+            overflow: hidden; 
+            height: auto; 
+        }
+        .banner-content-wrapper {
+            display: flex;
+            flex-direction: column; /* Padrão: coluna (imagem abaixo do texto) */
+            align-items: center;
+            justify-content: center;
+            padding: 0; /* Remove padding para a imagem preencher no mobile */
+        }
+        @media (min-width: 768px) {
+            .banner-content-wrapper {
+                flex-direction: row; /* Desktop: linha (imagem ao lado do texto) */
+                justify-content: space-between;
+                height: 450px; /* Altura fixa para o banner em desktop */
+            }
+            .banner-text-content {
+                flex: 1; /* Ocupa o espaço restante à esquerda */
+                padding: 4rem; /* Mais padding no desktop */
+            }
+            .banner-image-content {
+                flex-shrink: 0; /* Não encolhe a imagem */
+                width: 50%; /* Ocupa a metade direita */
+                height: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background-color: var(--color-secondary);
+            }
+            .banner-image-content img {
+                /* A imagem preenche o container da imagem */
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                /* Garante que o canto esquerdo superior da imagem não seja arredondado no desktop */
+                border-top-right-radius: 1.5rem; 
+                border-bottom-right-radius: 1.5rem;
+                border-top-left-radius: 0; /* Remove o arredondamento que vem do mobile */
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Modal de Alerta Customizado (Substitui alert()) -->
+    <div id="custom-alert" class="hidden bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full transition-all duration-300">
+        <h3 id="alert-title" class="text-xl font-bold mb-3 text-secondary">Atenção!</h3>
+        <p id="alert-message" class="text-gray-600 mb-4"></p>
+        <button onclick="hideAlert()" class="w-full btn-primary py-2 rounded-lg font-semibold">Entendi</button>
+    </div>
+    <div id="alert-overlay" class="hidden fixed inset-0 bg-black bg-opacity-50 z-[999]"></div>
+
+    <!-- Header e Navegação -->
+    <header class="bg-secondary shadow-lg sticky top-0 z-50">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <a href="#/" class="text-2xl font-extrabold text-white tracking-wider" onclick="navigate('/')">
+                <span class="text-primary">BodyLab</span>Cyber
+            </a>
+            <nav class="hidden md:flex space-x-6">
+                <!-- Usando navigate() nos links de navegação principal -->
+                <a href="#/products" class="text-white hover:text-primary transition duration-200" onclick="navigate('/products')">Produtos</a>
+                <a href="#/cart" class="text-white hover:text-primary transition duration-200" onclick="navigate('/cart')">Carrinho (<span id="cart-count">0</span>)</a>
+                <a href="#/orders" id="orders-link" class="text-white hover:text-primary transition duration-200 hidden" onclick="navigate('/orders')">Meus Pedidos</a>
+            </nav>
+            <div id="auth-actions" class="flex items-center space-x-3">
+                <!-- Ações de login/logout/usuário serão injetadas aqui -->
+            </div>
+            
+            <!-- Botão de Menu Mobile (simulação) -->
+            <a href="#/cart" onclick="navigate('/cart')" class="md:hidden text-white text-2xl relative">
+                &#x1F6D2;
+                <span id="cart-count-mobile" class="absolute -top-1 -right-1.5 text-xs bg-red-500 rounded-full w-4 h-4 flex items-center justify-center">0</span>
+            </a>
+            <button id="menu-button" class="md:hidden text-white text-2xl ml-3">
+                &#9776;
+            </button>
+        </div>
+    </header>
+
+    <!-- Conteúdo Principal da Aplicação -->
+    <main id="app-content" class="container mx-auto px-4 py-8 min-h-screen">
+        <!-- O conteúdo da página será injetado aqui pelo router -->
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white mt-12 pt-12 pb-6">
+        <div class="container mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-8">
+            <div>
+                <h4 class="text-xl font-bold mb-4 text-primary">BodyLabCyber</h4>
+                <p class="text-sm text-gray-400">Seu laboratório prático de pentest em E-commerce de suplementos.</p>
+            </div>
+            <div>
+                <h4 class="text-lg font-semibold mb-4">Institucional</h4>
+                <ul class="space-y-2 text-sm text-gray-400">
+                    <li><a href="#" class="hover:text-primary">Sobre Nós (Fake)</a></li>
+                    <li><a href="#" class="hover:text-primary">Contato (Fake)</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 class="text-lg font-semibold mb-4">Comprar</h4>
+                <ul class="space-y-2 text-sm text-gray-400">
+                    <li onclick="navigate('/products')"><a href="#/products" class="hover:text-primary">Todos os Produtos</a></li>
+                    <li onclick="navigate('/category/Whey')"><a href="#/category/Whey" class="hover:text-primary">Whey Protein</a></li>
+                    <li onclick="navigate('/category/Creatina')"><a href="#/category/Creatina" class="hover:text-primary">Creatina</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 class="text-lg font-semibold mb-4">Minha Conta</h4>
+                <ul class="space-y-2 text-sm text-gray-400">
+                    <li onclick="navigate('/login')"><a href="#/login" class="hover:text-primary">Login / Cadastro</a></li>
+                    <li onclick="navigate('/orders')"><a href="#/orders" class="hover:text-primary">Meus Pedidos (Lab)</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="container mx-auto px-4 mt-8 border-t border-gray-700 pt-6 text-center">
+            <p class="text-xs text-gray-500">
+                &copy; 2025 BodyLabCyber. Todos os direitos reservados. (Laboratório Prático de Cibersegurança)
+                <br>Atenção: Este é um ambiente simulado para fins educacionais de pentest.
+            </p>
+        </div>
+    </footer>
+
+    <script>
+        // Variáveis globais para o lab
+        const APP_CONTENT = document.getElementById('app-content');
+        const LOCAL_STORAGE_KEY = 'bodylab_cyber_lab_data';
+        
+        // Estado de autenticação global
+        let authMode = 'login'; // 'login' ou 'register'
+        
+        /**
+         * Funções Auxiliares para Persistência (Simulação de DB)
+         */
+        const loadLabData = () => {
+            try {
+                const data = localStorage.getItem(LOCAL_STORAGE_KEY);
+                return data ? JSON.parse(data) : { users: [], cart: {}, orders: [] };
+            } catch (e) {
+                console.error("Erro ao carregar dados do localStorage:", e);
+                return { users: [], cart: {}, orders: [] };
+            }
+        };
+
+        const saveLabData = (data) => {
+            try {
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
+            } catch (e) {
+                console.error("Erro ao salvar dados no localStorage:", e);
+            }
+        };
+
+        // Dados iniciais e estado da aplicação
+        let labData = loadLabData();
+        let currentUser = null; // null ou objeto do usuário logado
+
+        // --- MOCK DE DADOS INICIAIS (Produtos, Usuários, etc.) ---
+
+        const MOCK_PRODUCTS = [
+            { id: 101, name: 'Whey Protein Concentrado', category: 'Whey Protein', price: 129.90, description: 'Sabor Baunilha. Pote 900g. Fonte de proteína de alto valor biológico. Excelente para recuperação muscular e aumento de massa magra. Baixo teor de carboidratos e gorduras.', stock: 15, imageUrl: 'https://placehold.co/400x400/34d399/fff?text=WHEY' },
+            { id: 102, name: 'Creatina Monohidratada', category: 'Creatina', price: 89.90, description: 'Pote 300g. Pureza e resultados comprovados para força e explosão. Ajuda a aumentar os níveis de ATP, permitindo treinos mais intensos e volumosos.', stock: 25, imageUrl: 'https://placehold.co/400x400/1e3a8a/fff?text=CREATINA' },
+            { id: 103, name: 'Pré-Treino Carga Máxima', category: 'Pré-Treinos', price: 119.90, description: 'Sabor Limão. Pote 300g. Energia, foco e vasodilatação intensos. Contém 200mg de cafeína, beta-alanina e taurina para máxima performance.', stock: 10, imageUrl: 'https://placehold.co/400x400/f97316/fff?text=PRE-TREINO' },
+            { id: 104, name: 'Pasta de Amendoim Integral', category: 'Pastas de Amendoim', price: 34.90, description: 'Pote 1kg. 100% integral, excelente fonte de gorduras boas. Sem adição de açúcar ou conservantes. Ideal para lanches e dietas de bulk ou cutting.', stock: 50, imageUrl: 'https://placehold.co/400x400/fbbf24/1e3a8a?text=AMENDOIM' },
+            { id: 105, name: 'Barra de Proteína Zero', category: 'Barras de Proteínas', price: 69.90, description: 'Caixa c/ 12 unidades. Sabor Chocolate. Zero açúcar adicionado. Perfeita para um lanche rápido e proteico a qualquer hora do dia.', stock: 30, imageUrl: 'https://placehold.co/400x400/ef4444/fff?text=BARRA' },
+            { id: 106, name: 'Whey Protein Isolado', category: 'Whey Protein', price: 189.90, description: 'Sabor Morango. Pote 900g. Baixo carboidrato e gordura. Ideal para quem busca máxima definição muscular e rápida absorção.', stock: 8, imageUrl: 'https://placehold.co/400x400/065f46/fff?text=WHEY+ISOL' },
+            { id: 107, name: 'Beta-Alanina Pura', category: 'Pré-Treinos', price: 79.90, description: 'Pote 200g. Retarda a fadiga muscular. Causa leve formigamento (parestesia), sinal de que está agindo no seu corpo.', stock: 18, imageUrl: 'https://placehold.co/400x400/dc2626/fff?text=BETA' },
+        ];
+
+        // Se o banco de usuários simulado estiver vazio, preenche com usuários de teste
+        const MOCK_USERS = [
+            { id: 'user_001', name: 'Cliente Teste', email: 'user@lab.com', password: 'senha123', isAdmin: false },
+            { id: 'user_002', name: 'Administrador Falso', email: 'admin@lab.com', password: 'admin123', isAdmin: true },
+        ];
+        if (labData.users.length === 0) {
+            labData.users = MOCK_USERS;
+            saveLabData(labData);
+        }
+
+        // --- FUNÇÕES DE UTENSÍLIOS GERAIS ---
+
+        const formatCurrency = (value) => `R$ ${value.toFixed(2).replace('.', ',')}`;
+
+        const showAlert = (title, message) => {
+            document.getElementById('alert-title').textContent = title;
+            document.getElementById('alert-message').innerHTML = message; // Usar innerHTML para mensagens com formatação
+            document.getElementById('custom-alert').classList.remove('hidden');
+            document.getElementById('alert-overlay').classList.remove('hidden');
+        };
+
+        const hideAlert = () => {
+            document.getElementById('custom-alert').classList.add('hidden');
+            document.getElementById('alert-overlay').classList.add('hidden');
+        };
+        
+        // Função utilitária para encontrar um produto por ID
+        const getProductById = (id) => MOCK_PRODUCTS.find(p => p.id === parseInt(id));
+
+        // --- RENDERIZAÇÃO DE COMPONENTES ---
+
+        const renderProductCard = (product) => {
+            // Card de produto para a vitrine
+            return `
+                <!-- O href='#/product/${product.id}' garante que o URL hash mude -->
+                <a href="#/product/${product.id}" onclick="navigate('/product/${product.id}')" class="bg-white rounded-xl shadow-lg hover:shadow-xl transition duration-300 overflow-hidden flex flex-col cursor-pointer">
+                    <div class="h-48 bg-gray-100 flex items-center justify-center relative">
+                        <img src="${product.imageUrl}" alt="${product.name}" class="max-h-full max-w-full object-contain p-4">
+                        <span class="absolute top-3 left-3 bg-primary text-white text-xs font-bold px-3 py-1 rounded-full">Destaque</span>
+                    </div>
+                    <div class="p-5 flex flex-col flex-grow">
+                        <h3 class="text-lg font-semibold text-secondary mb-2">${product.name}</h3>
+                        <p class="text-gray-500 text-sm mb-4">${product.description.split('. ')[0]}...</p>
+                        <div class="mt-auto flex justify-between items-center pt-2">
+                            <span class="text-2xl font-bold text-primary">${formatCurrency(product.price)}</span>
+                            <!-- Importante: impedir o evento de navegação ao clicar em 'Adicionar' -->
+                            <button onclick="event.preventDefault(); event.stopPropagation(); addToCart(${product.id});" class="btn-primary py-2 px-4 rounded-lg text-sm font-semibold shadow-md">
+                                Adicionar
+                            </button>
+                        </div>
+                    </div>
+                </a>
+            `;
+        };
+        
+        const renderCategoryBadge = (category) => {
+            // Crachá de categoria para a seção de Exploração
+            return `
+                <!-- A tag <a> com navigate() garante a interação -->
+                <a href="#/category/${category}" onclick="navigate('/category/${category}')" class="flex flex-col items-center p-4 bg-white rounded-xl shadow-md hover:shadow-lg transition duration-300 cursor-pointer">
+                    <div class="w-16 h-16 rounded-full bg-primary bg-opacity-20 flex items-center justify-center mb-2">
+                        <span class="text-3xl text-primary font-bold">&#8623;</span>
+                    </div>
+                    <p class="font-semibold text-secondary text-center">${category}</p>
+                    <span class="text-xs text-gray-500">${MOCK_PRODUCTS.filter(p => p.category === category).length} produtos</span>
+                </a>
+            `;
+        };
+
+        // --- RENDERIZAÇÃO DE PÁGINAS ---
+
+        const renderHome = () => {
+            const featuredProducts = MOCK_PRODUCTS.slice(0, 4);
+            const categories = [...new Set(MOCK_PRODUCTS.map(p => p.category))];
+
+            APP_CONTENT.innerHTML = `
+                <!-- Banner Principal -->
+                <div class="main-banner rounded-3xl mb-12 shadow-2xl">
+                    <div class="container mx-auto px-4 py-8 md:py-0 banner-content-wrapper">
+                        
+                        <!-- 1. Conteúdo de Texto -->
+                        <div class="banner-text-content text-white text-center md:text-left p-4 md:p-8">
+                            <span class="bg-primary text-secondary font-bold text-xs px-3 py-1 rounded-full inline-block mb-4">⚡ Entrega Ultra-Rápida</span>
+                            <h1 class="text-4xl md:text-5xl font-extrabold mb-4 leading-tight">
+                                Suplementos em até <span class="text-primary">15 minutos</span>
+                            </h1>
+                            <p class="text-lg text-gray-300 mb-8">
+                                Whey, Pré-Treinos, Creatinas, Barras de proteínas e muito mais. Tudo o que você precisa, chegando rápido na sua casa!
+                            </p>
+                            <div class="flex flex-col sm:flex-row gap-4 mb-8 justify-center md:justify-start">
+                                <!-- Botão de navegação usa navigate() -->
+                                <a href="#/products" onclick="navigate('/products')" class="btn-primary py-3 px-8 rounded-full font-bold inline-block shadow-lg text-center">
+                                    Ver Produtos
+                                </a>
+                                <button class="bg-white text-secondary py-3 px-8 rounded-full font-bold shadow-lg hover:bg-gray-200 transition duration-200" onclick="showAlert('Como Funciona', 'Este é um site de laboratório de pentest! Na vida real, aqui explicaria sobre a entrega e processo de compra.')">
+                                    Como Funciona
+                                </button>
+                            </div>
+                            <div class="flex flex-wrap gap-x-8 gap-y-2 text-gray-300 text-sm font-semibold justify-center md:justify-start">
+                                <p class="flex items-center"><span class="text-primary text-xl mr-2">&#10003;</span> 15min Entrega rápida</p>
+                                <p class="flex items-center"><span class="text-primary text-xl mr-2">&#10003;</span> 500+ Produtos</p>
+                                <p class="flex items-center"><span class="text-primary text-xl mr-2">&#10003;</span> 24/7 Disponível</p>
+                            </div>
+                        </div>
+                        
+                        <!-- 2. Conteúdo da Imagem (Fachada da Loja) -->
+                        <div class="banner-image-content relative w-full md:w-1/2 h-64 md:h-full flex items-center justify-center p-0 overflow-hidden rounded-b-3xl md:rounded-r-3xl md:rounded-bl-none">
+                             <!-- Imagem de fachada com o link do Pinterest -->
+                             <img 
+                                src="https://i.pinimg.com/736x/25/bf/9b/25bf9b106e59fd6410c73cdc715c41ae.jpg" 
+                                alt="Fachada de loja de suplementos BodyLabCyber" 
+                                class="w-full h-full object-cover"
+                                onerror="this.onerror=null; this.src='https://placehold.co/800x450/1e3a8a/ffffff?text=BODYLAB+CYBER+PLACEHOLDER';"
+                             >
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Seção de Categorias -->
+                <h2 class="text-3xl font-bold text-secondary mb-8 text-center">Explorar por Categoria</h2>
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-12">
+                    ${categories.map(renderCategoryBadge).join('')}
+                </div>
+
+                <!-- Produtos em Destaque -->
+                <h2 class="text-3xl font-bold text-secondary mb-8 flex justify-between items-center">
+                    Produtos em Destaque
+                    <!-- Botão de navegação usa navigate() -->
+                    <a href="#/products" onclick="navigate('/products')" class="text-sm font-semibold text-primary hover:underline">Ver todos &rarr;</a>
+                </h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    ${featuredProducts.map(renderProductCard).join('')}
+                </div>
+            `;
+        };
+
+        const renderProducts = (category = null) => {
+            const filteredProducts = category
+                ? MOCK_PRODUCTS.filter(p => p.category === category)
+                : MOCK_PRODUCTS;
+
+            const categoryTitle = category ? `Produtos em: ${category}` : 'Todos os Produtos';
+
+            APP_CONTENT.innerHTML = `
+                <h1 class="text-3xl font-bold text-secondary mb-8">${categoryTitle}</h1>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    ${filteredProducts.map(renderProductCard).join('')}
+                    ${filteredProducts.length === 0 ? '<p class="text-gray-600 col-span-4">Nenhum produto encontrado nesta categoria.</p>' : ''}
+                </div>
+            `;
+        };
+        
+        const renderProductDetail = (productId) => {
+            const product = getProductById(productId);
+            
+            if (!product) {
+                APP_CONTENT.innerHTML = '<h1 class="text-4xl font-bold text-red-500 mt-10">404 - Produto Não Encontrado</h1><p>O produto solicitado não existe em nosso catálogo de laboratório.</p>';
+                return;
+            }
+
+            APP_CONTENT.innerHTML = `
+                <div class="flex items-center space-x-2 mb-8 text-gray-500 hover:text-primary transition duration-200 cursor-pointer" onclick="history.back()">
+                    <span class="text-xl">&larr;</span>
+                    <span class="font-medium">Voltar para a Vitrine</span>
+                </div>
+
+                <div class="bg-white p-6 rounded-xl shadow-2xl lg:flex lg:space-x-8">
+                    <!-- Coluna da Imagem -->
+                    <div class="lg:w-1/2 flex items-center justify-center p-4">
+                        <img 
+                            src="${product.imageUrl}" 
+                            alt="${product.name}" 
+                            class="rounded-xl object-contain max-h-[400px] w-full border border-gray-200 p-2"
+                        >
+                    </div>
+
+                    <!-- Coluna dos Detalhes -->
+                    <div class="lg:w-1/2 pt-6 lg:pt-0">
+                        <p class="text-sm font-semibold text-gray-500 uppercase mb-2">${product.category}</p>
+                        <h1 class="text-4xl font-extrabold text-secondary mb-4">${product.name}</h1>
+                        <p class="text-3xl font-bold text-primary mb-6">${formatCurrency(product.price)}</p>
+                        
+                        <h2 class="text-xl font-semibold text-secondary mb-2">Descrição Completa</h2>
+                        <p class="text-gray-600 mb-6">${product.description}</p>
+                        
+                        <div class="border-t border-gray-100 pt-6">
+                            <p class="text-sm text-gray-500 mb-2">Estoque (Lab Simulado): <span class="font-bold text-secondary">${product.stock} unidades</span></p>
+                            
+                            <button onclick="addToCart(${product.id})" class="w-full btn-primary py-3 rounded-lg font-bold text-lg shadow-lg">
+                                Adicionar ao Carrinho
+                            </button>
+                            
+                            <p class="mt-4 text-xs text-gray-400 text-center">
+                                Ponto de Teste: O estoque não é verificado de forma robusta. Tente adicionar mais do que o disponível via manipulação do carrinho.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        };
+
+        const renderLogin = () => {
+            // Renderiza o formulário de login/cadastro
+            
+            const isRegister = authMode === 'register';
+            const title = isRegister ? 'Crie Sua Conta (Lab)' : 'Acesse o BodyLabCyber';
+            const buttonText = isRegister ? 'Cadastrar' : 'Entrar';
+            const toggleText = isRegister ? 'Já tenho conta' : 'Ainda não sou cliente';
+
+            APP_CONTENT.innerHTML = `
+                <div class="max-w-md mx-auto bg-white p-8 rounded-xl shadow-2xl">
+                    <!-- Toggle Login/Register -->
+                    <div class="flex justify-center mb-6">
+                        <!-- Botão de alternância usa setAuthMode() -->
+                        <button 
+                            onclick="setAuthMode('${isRegister ? 'login' : 'register'}')" 
+                            class="text-sm font-semibold text-primary hover:underline"
+                        >
+                            ${toggleText}
+                        </button>
+                    </div>
+
+                    <h2 class="text-3xl font-bold text-secondary mb-6 text-center">${title}</h2>
+                    
+                    <form id="auth-form" onsubmit="handleAuth(event, '${authMode}')">
+                        
+                        <!-- Campo Nome (Somente no Cadastro) -->
+                        <div class="mb-4 ${isRegister ? '' : 'hidden'}" id="name-field">
+                            <label for="name" class="block text-gray-700 font-medium mb-2">Seu Nome</label>
+                            <input type="text" id="name" name="name" class="input-vulnerable w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none" placeholder="Nome Completo" ${isRegister ? 'required' : ''}>
+                        </div>
+
+                        <!-- Campo Email (Ambos) -->
+                        <div class="mb-4">
+                            <label for="email" class="block text-gray-700 font-medium mb-2">E-mail</label>
+                            <input type="email" id="email" name="email" class="input-vulnerable w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none" placeholder="user@lab.com (ou qualquer coisa)" required>
+                        </div>
+                        
+                        <!-- Campo Senha (Ambos) -->
+                        <div class="mb-6">
+                            <label for="password" class="block text-gray-700 font-medium mb-2">Senha</label>
+                            <input type="password" id="password" name="password" class="input-vulnerable w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none" placeholder="senha123 (ou qualquer coisa)" required>
+                        </div>
+                        
+                        <button type="submit" class="w-full btn-primary py-3 rounded-lg font-bold">
+                            ${buttonText}
+                        </button>
+                        
+                        <p class="text-center text-sm text-gray-500 mt-4">
+                            ${isRegister ? 'Seu cadastro é salvo localmente. Tente usar uma senha fraca!' : 'Ponto de Teste: O login é propositalmente falho e aceita qualquer credencial!'}
+                        </p>
+                    </form>
+                </div>
+            `;
+        };
+
+        const renderCart = () => {
+            const cartItems = Object.values(labData.cart);
+            const subtotal = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
+
+            let cartHtml = `
+                <h1 class="text-3xl font-bold text-secondary mb-8">Seu Carrinho (<span id="cart-item-count">${cartItems.length}</span> itens)</h1>
+                <div class="md:grid md:grid-cols-3 gap-8">
+                    <div class="md:col-span-2 space-y-4" id="cart-list">
+                        ${cartItems.length === 0 ? '<p class="text-gray-600 p-8 bg-white rounded-xl shadow">Seu carrinho está vazio. Adicione alguns suplementos!</p>' : ''}
+                        ${cartItems.map(item => `
+                            <div class="bg-white p-4 rounded-xl shadow flex items-center space-x-4">
+                                <img src="${item.imageUrl}" alt="${item.name}" class="w-16 h-16 object-contain rounded-lg border">
+                                <div class="flex-grow">
+                                    <h3 class="text-lg font-semibold text-secondary">${item.name}</h3>
+                                    <p class="text-gray-500 text-sm">${formatCurrency(item.price)}</p>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <button onclick="updateCartQuantity(${item.id}, ${item.quantity - 1})" class="text-xl px-2 text-gray-600 hover:text-red-500 font-bold">&minus;</button>
+                                    <span class="font-medium w-6 text-center">${item.quantity}</span>
+                                    <button onclick="updateCartQuantity(${item.id}, ${item.quantity + 1})" class="text-xl px-2 text-gray-600 hover:text-primary font-bold">&plus;</button>
+                                </div>
+                                <span class="text-lg font-bold w-20 text-right">${formatCurrency(item.price * item.quantity)}</span>
+                                <button onclick="removeFromCart(${item.id})" class="text-red-500 hover:text-red-700 ml-4">&times;</button>
+                            </div>
+                        `).join('')}
+                    </div>
+                    
+                    <div class="mt-8 md:mt-0">
+                        <div class="bg-white p-6 rounded-xl shadow-2xl sticky top-24">
+                            <h2 class="text-2xl font-bold text-secondary mb-4">Resumo do Pedido</h2>
+                            <div class="space-y-2 border-b pb-4 mb-4">
+                                <div class="flex justify-between">
+                                    <span>Subtotal:</span>
+                                    <span class="font-medium">${formatCurrency(subtotal)}</span>
+                                </div>
+                                <div class="flex justify-between text-red-500">
+                                    <span>Desconto (Lab):</span>
+                                    <span class="font-medium">- ${formatCurrency(0.00)}</span>
+                                </div>
+                                <div class="flex justify-between font-bold text-xl pt-2">
+                                    <span>Total:</span>
+                                    <span class="text-primary">${formatCurrency(subtotal)}</span>
+                                </div>
+                            </div>
+                            <button onclick="checkout()" ${cartItems.length === 0 ? 'disabled' : ''} class="w-full btn-primary py-3 rounded-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed">
+                                Finalizar Pedido
+                            </button>
+                            <p class="text-sm text-gray-500 mt-3">
+                                Total no carrinho: **${cartItems.length}** itens. Tente manipular o total via console/localStorage!
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            `;
+            APP_CONTENT.innerHTML = cartHtml;
+            // Atualiza a contagem do carrinho na navegação principal
+            updateCartCount(); 
+        };
+
+        const renderOrders = () => {
+            if (!currentUser) {
+                APP_CONTENT.innerHTML = `
+                    <div class="max-w-md mx-auto bg-white p-8 rounded-xl shadow-2xl text-center">
+                        <h2 class="text-2xl font-bold text-secondary mb-4">Área Restrita</h2>
+                        <p class="text-gray-600 mb-6">Você precisa estar logado para ver seus pedidos.</p>
+                        <a href="#/login" onclick="navigate('/login')" class="btn-primary py-2 px-6 rounded-lg font-bold">Ir para Login</a>
+                    </div>
+                `;
+                return;
+            }
+
+            // Simula a busca de pedidos no "banco"
+            const userOrders = labData.orders.filter(order => order.userId === currentUser.id);
+
+            APP_CONTENT.innerHTML = `
+                <h1 class="text-3xl font-bold text-secondary mb-8">Meus Pedidos - Lab ID: <span class="text-primary" id="current-user-id">${currentUser.id}</span></h1>
+                <p class="text-gray-600 mb-6">
+                    **Dica de Pentest:** Este ID de usuário (${currentUser.id}) é usado para buscar pedidos. Tente alterá-lo diretamente no código ou forçar a visualização de outros IDs para testar a vulnerabilidade **IDOR (Insecure Direct Object Reference)**.
+                </p>
+                <div class="space-y-6">
+                    ${userOrders.length === 0 ? '<p class="text-gray-600 p-8 bg-white rounded-xl shadow">Você ainda não tem pedidos. Que tal fazer uma compra de teste?</p>' : ''}
+                    
+                    ${userOrders.map(order => `
+                        <div class="bg-white p-6 rounded-xl shadow-lg">
+                            <div class="flex justify-between items-center border-b pb-3 mb-3">
+                                <h3 class="text-xl font-bold text-secondary">Pedido #${order.id}</h3>
+                                <span class="text-lg font-bold text-primary">${formatCurrency(order.total)}</span>
+                            </div>
+                            <p class="text-gray-600 mb-2">Data: ${order.date}</p>
+                            <p class="text-gray-600 mb-4">ID do Proprietário: <span class="font-mono text-xs bg-gray-100 p-1 rounded">${order.userId}</span></p>
+                            <h4 class="font-semibold text-secondary mb-2">Itens:</h4>
+                            <ul class="list-disc pl-5 text-gray-700 space-y-1">
+                                <li>${order.items.map(item => `${item.name} x ${item.quantity} (${formatCurrency(item.price * item.quantity)})`).join('</li><li>')}</li>
+                            </ul>
+                            <button onclick="simulateOrderManipulation('${order.id}')" class="mt-4 text-sm text-red-500 hover:text-red-700 font-medium">
+                                Simular Alteração de Pedido (Ponto de Teste)
+                            </button>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        };
+
+        // --- FUNÇÕES DE LÓGICA DO E-COMMERCE E PENTEST LAB ---
+
+        const updateAuthActions = () => {
+            const authActionsDiv = document.getElementById('auth-actions');
+            const ordersLink = document.getElementById('orders-link');
+
+            if (currentUser) {
+                // Ponto de XSS: O nome do usuário (que pode ser injetado) é inserido diretamente no DOM
+                // Tente injetar um script no campo "Nome" ao cadastrar!
+                const safeName = currentUser.name.replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+                authActionsDiv.innerHTML = `
+                    <div class="text-white text-sm">
+                        Olá, <span class="font-bold cursor-pointer" id="user-display-name" onclick="showAlert('Detalhes do Usuário', 'ID: ${currentUser.id}<br>Email: ${currentUser.email}<br>Nome: ${safeName} (Tente injetar XSS aqui!)')">${currentUser.name}</span>
+                    </div>
+                    <button onclick="handleLogout()" class="bg-red-500 hover:bg-red-600 text-white py-1.5 px-4 rounded-lg font-semibold transition duration-200 shadow-md">
+                        Sair
+                    </button>
+                `;
+                ordersLink.classList.remove('hidden');
+            } else {
+                authActionsDiv.innerHTML = `
+                    <!-- Botão de Login usa navigate() -->
+                    <a href="#/login" onclick="navigate('/login')" class="bg-primary hover:bg-white hover:text-primary text-secondary py-1.5 px-4 rounded-lg font-semibold transition duration-200 shadow-md">
+                        Entrar
+                    </a>
+                `;
+                // O ícone do carrinho no mobile já é renderizado fora, mas escondemos o link de pedidos
+                ordersLink.classList.add('hidden');
+            }
+        };
+
+        const updateCartCount = () => {
+            const count = Object.values(labData.cart).reduce((total, item) => total + item.quantity, 0);
+            document.getElementById('cart-count').textContent = count;
+            const mobileCountEl = document.getElementById('cart-count-mobile');
+            if (mobileCountEl) mobileCountEl.textContent = count;
+        };
+
+        const addToCart = (productId) => {
+            const product = getProductById(productId);
+            if (!product) return showAlert('Erro', 'Produto não encontrado.');
+
+            if (labData.cart[productId]) {
+                labData.cart[productId].quantity++;
+            } else {
+                labData.cart[productId] = { ...product, quantity: 1 };
+            }
+
+            saveLabData(labData);
+            updateCartCount();
+            showAlert('Sucesso', `${product.name} adicionado ao carrinho!`);
+        };
+
+        const updateCartQuantity = (productId, newQuantity) => {
+            if (newQuantity <= 0) {
+                return removeFromCart(productId);
+            }
+
+            if (labData.cart[productId]) {
+                // Ponto de Teste: A quantidade é atualizada sem checagem de regras de negócio (ex: limite de estoque)
+                labData.cart[productId].quantity = newQuantity;
+                saveLabData(labData);
+                // Re-renderiza o carrinho apenas se estiver na página do carrinho
+                if (window.location.hash.slice(1).startsWith('/cart')) {
+                    renderCart(); 
+                }
+            }
+        };
+
+        const removeFromCart = (productId) => {
+            delete labData.cart[productId];
+            saveLabData(labData);
+            // Re-renderiza o carrinho apenas se estiver na página do carrinho
+            if (window.location.hash.slice(1).startsWith('/cart')) {
+                renderCart(); 
+            }
+            updateCartCount();
+        };
+
+        const checkout = () => {
+            if (Object.keys(labData.cart).length === 0) {
+                return showAlert('Carrinho Vazio', 'Adicione itens antes de finalizar a compra.');
+            }
+            if (!currentUser) {
+                return showAlert('Requer Login', 'Você precisa estar logado para finalizar o pedido.');
+            }
+
+            const cartItems = Object.values(labData.cart);
+            const orderTotal = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
+
+            const newOrder = {
+                // Ponto de Teste: O ID do pedido é fácil de prever (sequencial)
+                id: (labData.orders.length + 1).toString().padStart(4, '0'),
+                userId: currentUser.id, // Ponto de Teste IDOR
+                date: new Date().toLocaleDateString('pt-BR'),
+                items: cartItems.map(item => ({
+                    id: item.id,
+                    name: item.name,
+                    price: item.price,
+                    quantity: item.quantity,
+                })),
+                // Ponto de Teste: O total pode ser alterado no cliente antes do checkout
+                total: orderTotal,
+                status: 'Aprovado'
+            };
+
+            labData.orders.push(newOrder);
+            labData.cart = {}; // Limpa o carrinho
+            saveLabData(labData);
+
+            showAlert('Pedido Realizado!', `Seu pedido #${newOrder.id} foi realizado com sucesso. Total: ${formatCurrency(newOrder.total)}.`);
+            navigate('/orders');
+        };
+
+        // Função para alternar entre Login e Cadastro
+        const setAuthMode = (mode) => {
+            authMode = mode;
+            navigate('/login'); // Força o re-render
+        };
+
+        const handleAuth = (event, mode) => {
+            event.preventDefault();
+            const form = event.target;
+            const email = form.email.value;
+            const password = form.password.value;
+            const name = form.name ? form.name.value : '';
+
+            if (!email || !password) {
+                return showAlert('Erro', 'Por favor, preencha o e-mail e a senha.');
+            }
+
+            // 1. Lógica de Cadastro (Register)
+            if (mode === 'register') {
+                if (labData.users.find(u => u.email.toLowerCase() === email.toLowerCase())) {
+                    return showAlert('Falha no Cadastro', 'Este e-mail já está em uso.');
+                }
+                
+                // Geração de ID simples (sempre começando com 'user_')
+                const newId = 'user_' + (labData.users.length + 10).toString();
+                
+                const newUser = {
+                    id: newId, 
+                    name: name.trim() || 'Usuário Sem Nome', 
+                    email: email, 
+                    password: password, 
+                    isAdmin: false 
+                };
+                
+                labData.users.push(newUser);
+                saveLabData(labData);
+                
+                // Loga o novo usuário automaticamente
+                currentUser = newUser;
+                localStorage.setItem('currentUser', JSON.stringify({id: newUser.id, name: newUser.name, email: newUser.email})); 
+                
+                updateAuthActions();
+                showAlert('Cadastro e Login Realizados!', `Bem-vindo(a) ${newUser.name}! Seu ID de teste é: ${newId}.`);
+                navigate('/');
+                return;
+            }
+
+            // 2. Lógica de Login (VULNERABILIDADE SIMULADA AJUSTADA)
+            
+            // Tenta encontrar o usuário com credenciais VÁLIDAS
+            let user = labData.users.find(u => 
+                u.email.toLowerCase() === email.toLowerCase() && u.password === password
+            );
+
+            // Se o login falhar (ou seja, as credenciais digitadas são fakes)...
+            if (!user) {
+                // Ponto de Teste: Aceita qualquer credencial para logar no primeiro usuário de teste ('user_001')
+                // Isso simula uma falha grave na lógica de autenticação (Broken Authentication)
+                const firstTestUser = labData.users.find(u => u.id === 'user_001');
+                
+                if (firstTestUser) {
+                    user = firstTestUser;
+                    showAlert('Login Simulado Bem-Sucedido!', `Você usou credenciais fakes, mas logou com sucesso no perfil de teste: ${user.name} (${user.email}). Hora de testar as permissões!`);
+                } else {
+                    return showAlert('Falha no Login', 'Credenciais inválidas e o usuário de teste padrão não foi encontrado.');
+                }
+            }
+
+
+            // Se chegou aqui, 'user' é o usuário válido OU o usuário de teste padrão (devido à falha simulada)
+            currentUser = user;
+            localStorage.setItem('currentUser', JSON.stringify({id: user.id, name: user.name, email: user.email})); 
+            updateAuthActions();
+            
+            // A mensagem de sucesso já foi disparada no bloco acima, se for o caso de credenciais fakes.
+            if (user.id !== 'user_001' || (user.email.toLowerCase() === email.toLowerCase() && user.password === password)) {
+                 showAlert('Login Bem-Sucedido', `Bem-vindo(a) ${user.name}! Hora de testar a segurança!`);
+            }
+            
+            navigate('/');
+        };
+
+        const handleLogout = () => {
+            currentUser = null;
+            localStorage.removeItem('currentUser');
+            updateAuthActions();
+            showAlert('Logout', 'Sessão encerrada. Volte sempre!');
+            navigate('/');
+        };
+        
+        const simulateOrderManipulation = (orderId) => {
+            // Ponto de Teste de IDOR e Broken Access Control/Data Manipulation
+            showAlert(
+                `Teste de Manipulação de Pedido #${orderId}`, 
+                `Em um teste de pentest, você tentaria: 
+                1. Alterar o 'userId' na sessão (localStorage) para ver se consegue visualizar este pedido se ele não for seu (IDOR). 
+                2. Tentar usar uma função de 'update' com este 'orderId' sem autenticação robusta para mudar o valor/status do pedido.
+                <br><br>
+                **Próximo Passo:** Abra o console (F12), inspecione a localStorage e tente mudar o ID do usuário, ou o valor de um item no carrinho/pedido antes do checkout!`
+            );
+        };
+
+
+        // --- LÓGICA DE ROTEAMENTO (SPA) ---
+        
+        const router = () => {
+            // Pega o caminho sem o '#' e trata o caso vazio
+            const path = window.location.hash.slice(1) || '/';
+            // Divide o caminho para pegar a rota base e o parâmetro (ID)
+            const parts = path.split('/');
+            const basePath = parts[1] || '/';
+            const param = parts[2]; // Captura o ID do produto ou categoria
+
+            // Remove a classe de overflow do body para evitar barras de rolagem estranhas em modals
+            document.body.classList.remove('overflow-hidden'); 
+
+            switch (basePath) {
+                case '': // Home
+                case '/':
+                    renderHome();
+                    break;
+                case 'products':
+                    renderProducts();
+                    break;
+                case 'category':
+                    renderProducts(param); // Param é o nome da categoria
+                    break;
+                case 'product': // ROTA PARA DETALHE DE PRODUTO
+                    if (param) {
+                        renderProductDetail(param); // Param é o ID do produto
+                    } else {
+                        renderProducts(); 
+                    }
+                    break;
+                case 'login':
+                    if (currentUser) {
+                        // Se já estiver logado, redireciona para a Home
+                        showAlert('Já Logado', `Você já está logado como ${currentUser.name}.`);
+                        navigate('/');
+                        return;
+                    }
+                    renderLogin();
+                    break;
+                case 'cart':
+                    renderCart();
+                    break;
+                case 'orders':
+                    renderOrders();
+                    break;
+                default:
+                    APP_CONTENT.innerHTML = '<h1 class="text-4xl font-bold text-red-500 mt-10">404 - Página Não Encontrada</h1>';
+            }
+            // Garante que o topo da página seja visto ao trocar a rota
+            window.scrollTo(0, 0); 
+        };
+        
+        // Função navigate que garante a mudança do hash e disparo do router
+        const navigate = (path) => {
+            // paths devem começar com '/' (ex: '/login', '/products/101')
+            if (path.startsWith('/')) {
+                path = path.slice(1);
+            }
+            window.location.hash = '/' + path;
+        };
+
+        // --- INICIALIZAÇÃO DA APLICAÇÃO ---
+        
+        const init = () => {
+            // 1. Carrega a sessão do usuário se existir no localStorage
+            const storedUser = localStorage.getItem('currentUser');
+            if (storedUser) {
+                try {
+                    // É importante garantir que o usuário carregado tenha todos os campos necessários
+                    currentUser = JSON.parse(storedUser);
+                } catch (e) {
+                    console.error("Erro ao carregar sessão:", e);
+                    localStorage.removeItem('currentUser');
+                }
+            }
+
+            // 2. Configura a escuta de eventos de navegação
+            window.addEventListener('hashchange', router);
+            
+            // 3. Atualiza a UI inicial e renderiza a rota atual
+            updateAuthActions();
+            updateCartCount();
+            
+            // Se o hash não estiver definido, o router() vai para a Home.
+            // Se estiver, ele renderiza o que está no hash.
+            router(); 
+            
+            // 4. Configura o menu mobile (simulação)
+            const menuButton = document.getElementById('menu-button');
+            menuButton.addEventListener('click', () => {
+                showAlert('Menu Mobile', 'Esta é uma simulação de menu, mas a navegação via URL/Hash funciona perfeitamente para testar o roteamento!');
+            });
+        };
+
+        // Inicia a aplicação após o carregamento do DOM
+        window.onload = init;
+
+    </script>
+</body>
+</html>
