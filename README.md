@@ -1,4 +1,4 @@
-# lab-ecommerce-pentes  
+# lab-ecommerce-pentest 
 Laboratório interativo para prática de pentest em aplicações web
 
 ![Capa do Projeto](https://vantix.com.br/wp-content/uploads/2022/03/pentest-hacker-cyberseguranca.jpg)
